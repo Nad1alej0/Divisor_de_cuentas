@@ -142,6 +142,11 @@ footer { margin:15px auto 0; color:#687870; font-size:11px; text-align:center; }
 }
 
 [hidden]{display:none!important}#choose { width:100%; background:var(--green); color:white; margin-bottom:12px; }
+.shares article>div{min-width:0;flex:1}
+.shares .edit-share{display:flex;align-items:center;gap:3px;color:var(--deep);font-weight:bold}
+.person-amount{font:inherit;font-size:1.15rem;color:inherit;border:0;border-bottom:1px dashed currentColor;background:transparent;width:7ch;min-width:0;max-width:100%;padding:4px 0}
+.person-amount[aria-invalid="true"],.check.unbalanced{color:#a31a26;background:#fff0f0}
+.check.unbalanced i{background:#a31a26}
 </style><main class="screen"><section class="app"><header><img class="logo" src="calculadora-trebol.png" alt="Calculadora con trébol de Munster"><div><p>MUNSTER</p><h1>Divisor de Cuentas</h1><span>Cobros simples. Caja exacta.</span></div></header><nav aria-label="Herramientas"><button class="active" id="splitTab">Dividir cuenta</button><button id="changeTab">Calcular vuelto</button></nav><div class="panel" id="split"><label><span>Total de la cuenta</span><div class="amount"><b>$</b><input id="total" aria-label="Total de la cuenta" inputmode="numeric"></div></label><div class="people"><span>¿Entre cuántas personas?</span><div class="stepper"><button id="minus" aria-label="Restar una persona">−</button><strong id="count"></strong><button id="plus" aria-label="Sumar una persona">+</button></div><div class="quick"><button>2</button><button>3</button><button>4</button><button>5</button><button>6</button><button>8</button><button>10</button></div></div><button class="primary" id="divide" disabled>Dividir cuenta</button><section class="results" id="results" hidden><div class="result-title"><div><small>RESULTADO</small><h2 id="heading"></h2></div><em>Redondeado a $10</em></div><button class="secondary" id="choose"></button><div class="shares" id="shares"></div><p class="note" id="note">El efectivo se redondea automáticamente a $100.</p><div class="check"><span>Total distribuido</span><strong id="sum"></strong><i>✓</i></div><button class="link" id="reset">Nueva cuenta</button></section></div><div class="panel" id="changePanel" hidden><label><span>Importe a cobrar</span><div class="amount"><b>$</b><input id="charge" aria-label="Importe a cobrar" inputmode="numeric"></div></label><label><span>El cliente entrega</span><div class="amount"><b>$</b><input id="received" aria-label="El cliente entrega" inputmode="numeric"></div></label><div class="change" id="balance"><span></span><strong></strong></div><button class="link" id="clear">Limpiar</button></div><button class="whatsapp" id="share"><span>↗</span> Compartir la aplicación por WhatsApp</button></section><footer>Hecho para el equipo de Munster</footer></main><script>
 const paymentNames = {
   none: "Sin definir",
@@ -209,7 +214,9 @@ function distributeWithPayments(total, payments) {
 
 const el=id=>document.getElementById(id);
 let people=3, payments=[], showPayments=false;
+let fixed=[];
 function updatePeople(n){
+ fixed=[];
  people=Math.max(2,Math.min(50,n));
  payments=Array.from({length:people},(_,i)=>payments[i]||"none");
  el("count").textContent=people;
@@ -218,16 +225,45 @@ function updatePeople(n){
  el("divide").hidden=false;
  el("divide").disabled=!numberFrom(el("total").value);
 }
-function calculate(){
+function allocation(total, fixed, methods){
+ const remaining=total-fixed.reduce((sum,value)=>sum+(value??0),0);
+ const automatic=methods.filter((_,i)=>fixed[i]==null);
+ const amounts=remaining>0 && automatic.length ? distributeWithPayments(remaining,automatic) : [];
+ let next=0;
+ return methods.map((_,i)=>fixed[i]??(amounts[next++]??0));
+}
+function refreshAmounts(active){
  const total=numberFrom(el("total").value);
- const parts=showPayments?distributeWithPayments(total,payments):distribute(total,people,10);
+ const amounts=allocation(total,fixed,showPayments?payments:payments.map(()=>"none"));
+ const sum=amounts.reduce((a,b)=>a+b,0);
+ const delta=sum-total;
+ document.querySelectorAll(".person-amount").forEach((input,i)=>{
+  if(input!==active) input.value=amounts[i].toLocaleString("es-AR");
+  input.setAttribute("aria-invalid",String(delta>0 && fixed[i]!=null));
+ });
+ const box=el("sum").parentElement;
+ box.classList.toggle("unbalanced",delta!==0);
+ box.firstElementChild.textContent=delta>0?"Se excede por":delta<0?"Falta repartir":"Total distribuido";
+ el("sum").textContent=pesos.format(delta?Math.abs(delta):sum);
+ box.lastElementChild.textContent=delta?"!":"✓";
+}
+function calculate(){
  el("results").hidden=false;
  el("divide").hidden=true;
  el("heading").textContent=people+" pagos";
  el("shares").replaceChildren();
- parts.forEach((amount,i)=>{
+ payments.forEach((_,i)=>{
   const row=document.createElement("article");
-  row.innerHTML="<div><span>Persona "+(i+1)+"</span><strong>"+pesos.format(amount)+"</strong></div>";
+  row.innerHTML='<div><span>Persona '+(i+1)+'</span><label class="edit-share">$ <input class="person-amount" inputmode="numeric" maxlength="16" aria-label="Editar importe de persona '+(i+1)+'"> ✎</label></div>';
+  const input=row.querySelector("input");
+  input.onfocus=()=>input.select();
+  input.oninput=()=>{
+   input.value=input.value.replace(/[^0-9.]/g,"");
+   fixed[i]=/\d/.test(input.value)?numberFrom(input.value):null;
+   refreshAmounts(input);
+  };
+  input.onblur=()=>refreshAmounts();
+  input.onkeydown=e=>{if(e.key==="Enter")input.blur()};
   if(showPayments){
    const menu=document.createElement("select");
    menu.setAttribute("aria-label","Medio de pago persona "+(i+1));
@@ -239,7 +275,7 @@ function calculate(){
  });
  el("choose").textContent=showPayments?"Ocultar medios de pago":"¿Cómo paga cada uno?";
  el("note").hidden=!(showPayments&&payments.includes("cash"));
- el("sum").textContent=pesos.format(parts.reduce((a,b)=>a+b,0));
+ refreshAmounts();
 }
 function change(){
  const charge=numberFrom(el("charge").value), received=numberFrom(el("received").value);
