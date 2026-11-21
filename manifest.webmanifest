@@ -1,0 +1,23 @@
+{
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "name": "Munster · Divisor de Cuentas",
+  "short_name": "Divisor Munster",
+  "lang": "es-AR",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#075743",
+  "icons": [
+    {
+      "src": "calculadora-trebol.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "calculadora-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
