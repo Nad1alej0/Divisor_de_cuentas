@@ -237,7 +237,7 @@ function calculate(){
   }
   el("shares").append(row);
  });
- el("choose").textContent=showPayments?"Ocultar medios de pago":"Elegir medios de pago";
+ el("choose").textContent=showPayments?"Ocultar medios de pago":"¿Cómo paga cada uno?";
  el("note").hidden=!(showPayments&&payments.includes("cash"));
  el("sum").textContent=pesos.format(parts.reduce((a,b)=>a+b,0));
 }
